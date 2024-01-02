@@ -51,6 +51,10 @@ export class EDAAppStack extends cdk.Stack {
       displayName: "New Image topic",
     }); 
 
+    const existingImageTopic = new sns.Topic(this, "ExistingImageTopic", {
+      displayName: "Existing Image topic",
+    }); 
+
     // Lambda functions
 
     const processImageFn = new lambdanode.NodejsFunction(
@@ -70,6 +74,36 @@ export class EDAAppStack extends cdk.Stack {
       }
     );
 
+    const deleteImageFn = new lambdanode.NodejsFunction(
+      this,
+      "DeleteImageFn",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        entry: `${__dirname}/../lambdas/deleteImage.ts`,
+        timeout: cdk.Duration.seconds(15),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: imageTable.tableName,
+          REGION: 'eu-west-1',
+        }
+      }
+    );
+
+    const updateImageDescriptionFn = new lambdanode.NodejsFunction(
+      this,
+      "UpdateImageDescriptionFn",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        entry: `${__dirname}/../lambdas/updateImageDescription.ts`,
+        timeout: cdk.Duration.seconds(15),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: imageTable.tableName,
+          REGION: 'eu-west-1',
+        }
+      }
+    );
+
     const confirmationMailerFn = new lambdanode.NodejsFunction(this, "confirmation-mailer-function", {
       runtime: lambda.Runtime.NODEJS_16_X,
       memorySize: 1024,
@@ -84,12 +118,19 @@ export class EDAAppStack extends cdk.Stack {
       entry: `${__dirname}/../lambdas/rejectionMailer.ts`,
     });
 
-  // Topic Subscriptions
+  // Topic 1 Subscriptions
   const lambdaSub = new subs.LambdaSubscription(confirmationMailerFn) 
   const queueSub = new subs.SqsSubscription(imageProcessQueue)
 
   newImageTopic.addSubscription(lambdaSub); //Confirmation mailer directly subscribed to newImageTopic 
   newImageTopic.addSubscription(queueSub);
+
+  // Topic 2 Subscriptions
+  const deleteSub = new subs.LambdaSubscription(deleteImageFn) 
+  const updateSub = new subs.LambdaSubscription(updateImageDescriptionFn) 
+
+  existingImageTopic.addSubscription(deleteSub); 
+  existingImageTopic.addSubscription(updateSub);
 
   // Event triggers
 
@@ -97,6 +138,11 @@ export class EDAAppStack extends cdk.Stack {
     s3.EventType.OBJECT_CREATED,
     new s3n.SnsDestination(newImageTopic)  // Changed
 );
+
+  imagesBucket.addEventNotification( 
+  s3.EventType.OBJECT_REMOVED,
+  new s3n.LambdaDestination(deleteImageFn)
+  );
 
   const newImageEventSource = new events.SqsEventSource(imageProcessQueue, {
     batchSize: 5,
@@ -114,9 +160,17 @@ export class EDAAppStack extends cdk.Stack {
 
 
   // Permissions
-
+  //Process Image Lambda
   imagesBucket.grantRead(processImageFn);
   imageTable.grantReadWriteData(processImageFn);
+
+  // Delete Image Lambda
+  imagesBucket.grantReadWrite(deleteImageFn);
+  imageTable.grantReadWriteData(deleteImageFn);
+
+  // Update Image Description Lambda
+  imagesBucket.grantReadWrite(updateImageDescriptionFn);
+  imageTable.grantReadWriteData(updateImageDescriptionFn);
 
   confirmationMailerFn.addToRolePolicy(
     new iam.PolicyStatement({
