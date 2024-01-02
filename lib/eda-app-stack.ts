@@ -29,7 +29,6 @@ export class EDAAppStack extends cdk.Stack {
         name: "ImageName", 
         type: dynamodb.AttributeType.STRING, 
       },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
@@ -123,10 +122,6 @@ export class EDAAppStack extends cdk.Stack {
     
     new cdk.CfnOutput(this, "bucketName", {
       value: imagesBucket.bucketName,
-    });
-
-    new cdk.CfnOutput(this, "ImageTableName", {
-      value: imageTable.tableName,
     });
   }
 }
