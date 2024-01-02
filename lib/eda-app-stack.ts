@@ -34,8 +34,16 @@ export class EDAAppStack extends cdk.Stack {
 
     // Integration infrastructure
 
+    const deadLetterQueue = new sqs.Queue(this, "dead-letter-queue", { 
+      retentionPeriod: cdk.Duration.minutes(30),
+    });
+
     const imageProcessQueue = new sqs.Queue(this, "img-created-queue", {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
+      deadLetterQueue: {
+        queue: deadLetterQueue,
+        maxReceiveCount: 2 // Stops images that arent processed successfully from filling up dead letter queue.
+      }
     });
 
     //SNS Topic
@@ -58,18 +66,26 @@ export class EDAAppStack extends cdk.Stack {
           TABLE_NAME: imageTable.tableName,
           REGION: 'eu-west-1',
         },
+        deadLetterQueue: deadLetterQueue
       }
     );
 
-    const mailerFn = new lambdanode.NodejsFunction(this, "mailer-function", {
+    const confirmationMailerFn = new lambdanode.NodejsFunction(this, "confirmation-mailer-function", {
       runtime: lambda.Runtime.NODEJS_16_X,
       memorySize: 1024,
       timeout: cdk.Duration.seconds(3),
-      entry: `${__dirname}/../lambdas/mailer.ts`,
+      entry: `${__dirname}/../lambdas/confirmationMailer.ts`,
+    });
+
+    const rejectionMailerFn = new lambdanode.NodejsFunction(this, "rejection-mailer-function", {
+      runtime: lambda.Runtime.NODEJS_16_X,
+      memorySize: 1024,
+      timeout: cdk.Duration.seconds(3),
+      entry: `${__dirname}/../lambdas/rejectionMailer.ts`,
     });
 
   // Topic Subscriptions
-  const lambdaSub = new subs.LambdaSubscription(mailerFn) 
+  const lambdaSub = new subs.LambdaSubscription(confirmationMailerFn) 
   const queueSub = new subs.SqsSubscription(imageProcessQueue)
 
   newImageTopic.addSubscription(lambdaSub); //Confirmation mailer directly subscribed to newImageTopic 
@@ -87,8 +103,14 @@ export class EDAAppStack extends cdk.Stack {
     maxBatchingWindow: cdk.Duration.seconds(10),
   });
 
+  const rejectionMailerEventSource = new events.SqsEventSource(deadLetterQueue, {
+    batchSize: 5,
+    maxBatchingWindow: cdk.Duration.seconds(10),
+  });
+
 
   processImageFn.addEventSource(newImageEventSource);
+  rejectionMailerFn.addEventSource(rejectionMailerEventSource);
 
 
   // Permissions
@@ -96,7 +118,19 @@ export class EDAAppStack extends cdk.Stack {
   imagesBucket.grantRead(processImageFn);
   imageTable.grantReadWriteData(processImageFn);
 
-  mailerFn.addToRolePolicy(
+  confirmationMailerFn.addToRolePolicy(
+    new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:SendTemplatedEmail",
+      ],
+      resources: ["*"],
+    })
+  );
+
+  rejectionMailerFn.addToRolePolicy(
     new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [

@@ -56,9 +56,10 @@ export const handler: SQSHandler = async (event) => {
           })
         )
       }
+    } else{
+      console.log("Error")
     }
   }
-
 };
 
 function createDDbDocClient() {
