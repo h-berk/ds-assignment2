@@ -38,10 +38,6 @@ export class EDAAppStack extends cdk.Stack {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
     });
 
-    const mailerQ = new sqs.Queue(this, "mailer-queue", {
-      receiveMessageWaitTime: cdk.Duration.seconds(10),
-    });
-
     //SNS Topic
     const newImageTopic = new sns.Topic(this, "NewImageTopic", {
       displayName: "New Image topic",
@@ -72,13 +68,12 @@ export class EDAAppStack extends cdk.Stack {
       entry: `${__dirname}/../lambdas/mailer.ts`,
     });
 
-  // SNS subscription
+  // Topic Subscriptions
+  const lambdaSub = new subs.LambdaSubscription(mailerFn) 
+  const queueSub = new subs.SqsSubscription(imageProcessQueue)
 
-  newImageTopic.addSubscription(
-    new subs.SqsSubscription(imageProcessQueue)
-  );
-
-  newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
+  newImageTopic.addSubscription(lambdaSub); //Confirmation mailer directly subscribed to newImageTopic 
+  newImageTopic.addSubscription(queueSub);
 
   // Event triggers
 
@@ -92,13 +87,9 @@ export class EDAAppStack extends cdk.Stack {
     maxBatchingWindow: cdk.Duration.seconds(10),
   });
 
-  const newImageMailEventSource = new events.SqsEventSource(mailerQ, {
-    batchSize: 5,
-    maxBatchingWindow: cdk.Duration.seconds(10),
-  }); 
 
   processImageFn.addEventSource(newImageEventSource);
-  mailerFn.addEventSource(newImageMailEventSource);
+
 
   // Permissions
 
