@@ -2,26 +2,21 @@
 
 __Name:__ Hasan Berk
 
-__YouTube Demo link__ - [The URL of your demonstration of the app.]
+__YouTube Demo link__ - https://youtu.be/S5zwLN56iSE
 
-[ Note: The video must include an audio.]
 
 ### Phase 1.
 
 + Confirmation Mailer - Fully implemented.
 + Rejection Mailer - Fully implemented.
-+ Process Image - Partially implemented
++ Process Image - Fully implemented
 
-### Phase 2 (if relevant).
-
-[ List the Lambda functions in this phase's architecture and state their working status.]
-
- e.g.
+### Phase 2. 
 
 + Confirmation Mailer - Fully implemented.
 + Rejection Mailer - Fully implemented.
 + Process Image - Fully implemented
-+ Process Delete - Partially implemented.
++ Process Delete - Fully implemented.
 + Update Table - Not implemented.
 
 
