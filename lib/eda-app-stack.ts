@@ -2,6 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as lambdanode from "aws-cdk-lib/aws-lambda-nodejs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as events from "aws-cdk-lib/aws-lambda-event-sources";
 import * as sqs from "aws-cdk-lib/aws-sqs";
@@ -20,6 +21,16 @@ export class EDAAppStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       publicReadAccess: false,
+    });
+
+    const imageTable = new dynamodb.Table(this, "ImageTable", {
+      tableName: "Images",
+      partitionKey: {
+        name: "ImageName", 
+        type: dynamodb.AttributeType.STRING, 
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
     // Integration infrastructure
@@ -48,6 +59,10 @@ export class EDAAppStack extends cdk.Stack {
         entry: `${__dirname}/../lambdas/processImage.ts`,
         timeout: cdk.Duration.seconds(15),
         memorySize: 128,
+        environment: {
+          TABLE_NAME: imageTable.tableName,
+          REGION: 'eu-west-1',
+        },
       }
     );
 
@@ -89,6 +104,8 @@ export class EDAAppStack extends cdk.Stack {
   // Permissions
 
   imagesBucket.grantRead(processImageFn);
+  imageTable.grantReadWriteData(processImageFn);
+
   mailerFn.addToRolePolicy(
     new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
@@ -101,10 +118,15 @@ export class EDAAppStack extends cdk.Stack {
     })
   );
 
+
     // Output
     
     new cdk.CfnOutput(this, "bucketName", {
       value: imagesBucket.bucketName,
+    });
+
+    new cdk.CfnOutput(this, "ImageTableName", {
+      value: imageTable.tableName,
     });
   }
 }
