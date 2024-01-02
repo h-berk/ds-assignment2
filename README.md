@@ -17,6 +17,6 @@ __YouTube Demo link__ - https://youtu.be/S5zwLN56iSE
 + Rejection Mailer - Fully implemented.
 + Process Image - Fully implemented
 + Process Delete - Fully implemented.
-+ Update Table - Not implemented.
++ Update Table - Fully implemented.
 
 
