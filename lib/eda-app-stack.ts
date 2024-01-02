@@ -127,10 +127,20 @@ export class EDAAppStack extends cdk.Stack {
 
   // Topic 2 Subscriptions
   const deleteSub = new subs.LambdaSubscription(deleteImageFn) 
-  const updateSub = new subs.LambdaSubscription(updateImageDescriptionFn) 
+  //Filter to update caption
+  const updateSub = new subs.LambdaSubscription(updateImageDescriptionFn, {
+    filterPolicy: {
+      comment_type: sns.SubscriptionFilter.stringFilter({
+        allowlist: ["Caption"], 
+      }),
+    }
+  });
 
   existingImageTopic.addSubscription(deleteSub); 
-  existingImageTopic.addSubscription(updateSub);
+  existingImageTopic.addSubscription(updateSub); 
+
+  
+
 
   // Event triggers
 
@@ -141,8 +151,9 @@ export class EDAAppStack extends cdk.Stack {
 
   imagesBucket.addEventNotification( 
   s3.EventType.OBJECT_REMOVED,
-  new s3n.LambdaDestination(deleteImageFn)
+  new s3n.SnsDestination(existingImageTopic) // Added
   );
+
 
   const newImageEventSource = new events.SqsEventSource(imageProcessQueue, {
     batchSize: 5,
@@ -201,6 +212,10 @@ export class EDAAppStack extends cdk.Stack {
     
     new cdk.CfnOutput(this, "bucketName", {
       value: imagesBucket.bucketName,
+    });
+
+    new cdk.CfnOutput(this, "topicARN", {
+      value: existingImageTopic.topicArn, //Needed to update image description
     });
   }
 }

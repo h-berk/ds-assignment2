@@ -1,19 +1,7 @@
-/* eslint-disable import/extensions, import/no-absolute-path */
 import { SQSHandler } from "aws-lambda";
-// import { sharp } from "/opt/nodejs/sharp-utils";
-import {
-  GetObjectCommand,
-  PutObjectCommandInput,
-  GetObjectCommandInput,
-  S3Client,
-  PutObjectCommand,
-} from "@aws-sdk/client-s3";
-
-//Import dynamoDB
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 
-const s3 = new S3Client();
 const ddbDocClient = createDDbDocClient(); //DynamoDB client
 
 export const handler: SQSHandler = async (event) => {
